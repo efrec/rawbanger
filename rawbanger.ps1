@@ -359,8 +359,11 @@ $mod_select = [ordered] @{
 		object  = 'CREATURE'
 		process = {
 			param($content, $name)
-			if ($content.Contains('[PET]') -and $content -match '\[MAXAGE:(\d+):(\d+)]') {
+			$min, $max = 100, 100
+			if ($content -match '\[MAXAGE:(\d+):(\d+)]') {
 				$min, $max = [int] $Matches[1], [int] $Matches[2]
+			}
+			if ($content.Contains('[PET]')) {
 				if ($min -lt 5 -or $min + $max -le 12) {
 					if ($content.Contains('[PET_EXOTIC]')) {
 						return "`t[CV_REMOVE_TAG:PET]"
@@ -369,6 +372,9 @@ $mod_select = [ordered] @{
 						return "`t[CV_REMOVE_TAG:PET][PET_EXOTIC]"
 					}
 				}
+			}
+			elseif (($min -eq 1 -or $min + $max -lt 5) -and $content.Contains('[PET_EXOTIC]')) {
+				return "`t[CV_REMOVE_TAG:PET_EXOTIC]"
 			}
 		}
 	}
