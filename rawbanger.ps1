@@ -52,10 +52,6 @@ $mod_dictionaries = [ordered] @{
 		token  = 'LS_PALETTE_FILE'
 		source = 'dictionary_path.txt'
 	}
-	ConvertInorganic          = @{
-		tokens = 'INORGANIC', 'TISSUE', 'TISSUE_MATERIAL:INORGANIC'
-		source = 'dictionary_inorganic.txt'
-	}
 	ModdedAnimalPeople        = @{
 		token      = 'BODY'
 		source     = 'dictionary_animal_people.txt'
@@ -663,7 +659,8 @@ function Out-Report {
 		""
 		tree "$out\$folder" /F | Select-Object -Skip 2
 		""
-		"$mod contains $num_all files ($num_txt txt, $num_png png) totalling $len_all KB ($len_txt txt, $len_png png)."
+		"$mod contains $num_all files ($num_txt txt, $num_png png)"
+		"with a total size of $len_all KB ($len_txt txt, $len_png png)"
 		""
 		"Done at $(Get-Date) in $('{0:N2}' -f ((Get-Date) - $script:start_time).TotalSeconds) seconds."
 	}
@@ -827,6 +824,8 @@ function Add-CreatureVariation {
 	Add-Content -Path $path -Value $variation
 }
 
+# todo: most build time is spent here in IO; load each file once and run all selects on it
+
 function Add-SelectObjectEntry {
 	[CmdletBinding()] param (
 		[Parameter(ValueFromPipeline, Mandatory)] [hashtable] $Tasks
@@ -841,8 +840,8 @@ function Add-SelectObjectEntry {
 
 		$module = $Task.module
 		$target = $Task.target
-		$output = $Task.output ?? "objects\$($object.ToLower())_patch_$mod.txt".ToLower()
 		$object = $Task.object
+		$output = $Task.output ?? "objects\$($object)_patch_$mod.txt".ToLower()
 		$terminal = $Task.terminal ?? $object
 		$filter = $Task.filter ?? '\A\z'
 		$process = $Task.process ?? { $null }
@@ -866,8 +865,8 @@ function Add-SelectObjectEntry {
 			$matched = $file_content | Select-String -Pattern $pattern -AllMatches
 			$matched | ? { $_.Matches.Value -notmatch $filter } | % {
 				$_.Matches | % {
-					$entry_name = $_.Groups[1].Value
 					$entry_content = $_.Groups[0].Value
+					$entry_name = $_.Groups[1].Value
 					$from_subtokens = (& $process -content $entry_content -name $entry_name) | ? { $_ } | Out-String | % TrimEnd
 					$all_strings = $entries[$entry_name], $prepend, $from_subtokens, $append | ? { $_ -and $_.Length -gt 3 }
 					$entries[$entry_name] = $all_strings -join "`n"
@@ -889,11 +888,11 @@ function Add-SelectObjectEntry {
 
 		$content = ''
 		$entries = $outputs[$output]
+		$selects = $object -replace '_.*$', '' # e.g. ITEM_ARMOR => ITEM
 
 		foreach ($entry_name in $entries.Keys) {
 			$entry_content = $entries[$entry_name]
 			if ($entry_content -and $entry_content.Length -gt 2) {
-				$selects = $object -replace '_.*$', ''            # e.g. ITEM_ARMOR => ITEM
 				$content += "[SELECT_$selects`:$entry_name]`n$entry_content`n" -replace '\n+\z', "`n`n"
 			}
 		}
